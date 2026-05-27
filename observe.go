@@ -135,7 +135,11 @@ func RunCommandWithConfig(cfg *Config, fs fileSystem, op Output, args []string, 
 	}
 	cmd := FindCommand(args[0])
 	if cmd == nil {
-		fmt.Fprintf(os.Stderr, "\nobserve: there is no command named %q for object type %s\n\n", args[0], args[1])
+		if len(args) > 1 {
+			fmt.Fprintf(os.Stderr, "\nobserve: there is no command named %q for object type %s\n\n", args[0], args[1])
+		} else {
+			fmt.Fprintf(os.Stderr, "\nobserve: there is no command named %q\n\n", args[0])
+		}
 		help()
 	}
 	var errors []string
