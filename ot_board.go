@@ -112,7 +112,7 @@ func (*objectTypeBoard) GetPresentationLabels() []string { return []string{"id",
 func (*objectTypeBoard) GetProperties() []PropertyDesc   { return propertyDescBoard }
 
 var gqlListBoard = compileGqlQuery(
-	`query Board_List($workspaceId: ObjectId!) {
+	`query Board_List($workspaceId: [ObjectId!]!) {
 		dashboardSearch(terms: { workspaceId: $workspaceId }) {
 			dashboards {
 				score
@@ -128,7 +128,7 @@ func (ot *objectTypeBoard) List(cfg *Config, op Output, hc httpClient) ([]*Objec
 	if workspaceId == "" {
 		workspaceId = "42379913"
 	}
-	obj, err := gqlListBoard.query(cfg, op, hc, object{"workspaceId": workspaceId})
+	obj, err := gqlListBoard.query(cfg, op, hc, object{"workspaceId": []string{workspaceId}})
 	if err != nil || obj == nil {
 		return nil, err
 	}
