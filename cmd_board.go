@@ -69,6 +69,17 @@ func readBoardInput(fa FuncArgs, filePath string) (map[string]any, error) {
 	for _, f := range readOnlyBoardFields {
 		delete(input, f)
 	}
+	// Normalize stages: the GraphQL DashboardStageInput type requires "input"
+	// to be defined. Stages with no dataset input must send [] not omit the field.
+	if stages, ok := input["stages"].([]any); ok {
+		for _, s := range stages {
+			if stage, ok := s.(map[string]any); ok {
+				if _, hasInput := stage["input"]; !hasInput {
+					stage["input"] = []any{}
+				}
+			}
+		}
+	}
 	return input, nil
 }
 
