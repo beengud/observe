@@ -53,6 +53,10 @@ var gqlSaveBoard = compileGqlQuery(
 	"data", "saveDashboard",
 )
 
+// readOnlyBoardFields are fields returned by the Observe API that are not
+// accepted as input by the saveDashboard mutation.
+var readOnlyBoardFields = []string{"updatedDate"}
+
 func readBoardInput(fa FuncArgs, filePath string) (map[string]any, error) {
 	data, err := fa.fs.ReadFile(filePath)
 	if err != nil {
@@ -61,6 +65,9 @@ func readBoardInput(fa FuncArgs, filePath string) (map[string]any, error) {
 	var input map[string]any
 	if err := json.Unmarshal(data, &input); err != nil {
 		return nil, fmt.Errorf("board: could not parse JSON from %q: %w", filePath, err)
+	}
+	for _, f := range readOnlyBoardFields {
+		delete(input, f)
 	}
 	return input, nil
 }
