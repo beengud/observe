@@ -209,3 +209,76 @@ func TestCmdDatasetImpactWithErrors(t *testing.T) {
 		t.Errorf("expected error dataset in error output, got: %q", errOut)
 	}
 }
+
+// TestCmdDatasetDryRunMultipleErrors verifies that multiple errorDatasets are all printed
+// and that exit 1 is still triggered.
+func TestCmdDatasetDryRunMultipleErrors(t *testing.T) {
+	fix := startFixture(t,
+		testRequest{"/v1/meta", 200, `{"data":{"saveDatasetDryRun":{
+			"dataset":null,
+			"dematerializedDatasets":[],
+			"errorDatasets":[
+				{"dataset":{"id":"77001","name":"Err1"},"errorText":"first error"},
+				{"dataset":{"id":"77002","name":"Err2"},"errorText":"second error"}
+			]
+		}}}`},
+	)
+	fix.fs.WriteFile("input.json", []byte(testDryRunInput), 0)
+	mustPanic(t, func() {
+		RunCommandWithConfig(fix.cfg, fix.fs, fix.op, []string{"dataset", "dry-run", "input.json"}, fix.hc)
+	})
+	fix.Assert()
+
+	out := fix.op.OutputBuf.String()
+	if !strings.Contains(out, "Error in Err1: first error") {
+		t.Errorf("expected first error in output, got: %q", out)
+	}
+	if !strings.Contains(out, "Error in Err2: second error") {
+		t.Errorf("expected second error in output, got: %q", out)
+	}
+}
+
+// TestCmdDatasetDryRunGqlError verifies that a GraphQL-level error (errors field in response)
+// is surfaced as an error.
+func TestCmdDatasetDryRunGqlError(t *testing.T) {
+	fix := startFixture(t,
+		testRequest{"/v1/meta", 200, `{"errors":[{"message":"unauthorized"}]}`},
+	)
+	fix.fs.WriteFile("input.json", []byte(testDryRunInput), 0)
+	mustPanic(t, func() {
+		RunCommandWithConfig(fix.cfg, fix.fs, fix.op, []string{"dataset", "dry-run", "input.json"}, fix.hc)
+	})
+	fix.Assert()
+
+	if !strings.Contains(fix.op.ErrorBuf.String(), "unauthorized") {
+		t.Errorf("expected GQL error in output, got: %q", fix.op.ErrorBuf.String())
+	}
+}
+
+// TestCmdDatasetImpactGqlError verifies that a GraphQL-level error is surfaced.
+func TestCmdDatasetImpactGqlError(t *testing.T) {
+	fix := startFixture(t,
+		testRequest{"/v1/meta", 200, `{"errors":[{"message":"forbidden"}]}`},
+	)
+	fix.fs.WriteFile("input.json", []byte(testDryRunInput), 0)
+	mustPanic(t, func() {
+		RunCommandWithConfig(fix.cfg, fix.fs, fix.op, []string{"dataset", "impact", "input.json"}, fix.hc)
+	})
+	fix.Assert()
+
+	if !strings.Contains(fix.op.ErrorBuf.String(), "forbidden") {
+		t.Errorf("expected GQL error in output, got: %q", fix.op.ErrorBuf.String())
+	}
+}
+
+// TestCmdDatasetImpactMissingFile verifies that a missing input file produces an error.
+func TestCmdDatasetImpactMissingFile(t *testing.T) {
+	fix := startFixture(t)
+	mustPanic(t, func() {
+		RunCommandWithConfig(fix.cfg, fix.fs, fix.op, []string{"dataset", "impact", "nonexistent.json"}, fix.hc)
+	})
+	if !strings.Contains(fix.op.ErrorBuf.String(), "could not read file") {
+		t.Error("expected file-not-found error in output:", fix.op.ErrorBuf.String())
+	}
+	fix.Assert()
+}
