@@ -415,3 +415,186 @@ func TestMonitorV2PresentationLabels(t *testing.T) {
 		t.Errorf("unexpected presentation labels:\n%s", diff)
 	}
 }
+
+// --- Issue #19: additional unit test coverage ---
+
+func TestCmdListMonitorDisabledTrue(t *testing.T) {
+	fix := startFixture(t,
+		testRequest{"/v1/meta", 200, `{"data":{"searchMonitorV2":{"monitors":[
+			{"id":"mon-disabled","name":"Disabled Monitor","description":"","disabled":true,"updatedDate":"2024-01-01T00:00:00Z"}
+		]}}}`},
+	)
+	RunCommandWithConfig(fix.cfg, fix.fs, fix.op, []string{"list", "monitor"}, fix.hc)
+	if diff := fix.op.ErrorBuf.String(); diff != "" {
+		t.Error("unexpected error output:", diff)
+	}
+	out := fix.op.OutputBuf.String()
+	if !strings.Contains(out, "mon-disabled") {
+		t.Error("expected disabled monitor id in output:", out)
+	}
+	if !strings.Contains(out, "true") {
+		t.Error("expected 'true' disabled value in output:", out)
+	}
+}
+
+func TestCmdListMonitorDisabledFalse(t *testing.T) {
+	fix := startFixture(t,
+		testRequest{"/v1/meta", 200, `{"data":{"searchMonitorV2":{"monitors":[
+			{"id":"mon-enabled","name":"Active Monitor","description":"","disabled":false,"updatedDate":"2024-02-01T00:00:00Z"}
+		]}}}`},
+	)
+	RunCommandWithConfig(fix.cfg, fix.fs, fix.op, []string{"list", "monitor"}, fix.hc)
+	if diff := fix.op.ErrorBuf.String(); diff != "" {
+		t.Error("unexpected error output:", diff)
+	}
+	out := fix.op.OutputBuf.String()
+	if !strings.Contains(out, "false") {
+		t.Error("expected 'false' disabled value in output:", out)
+	}
+}
+
+func TestCmdMonitorPreviewQueryInvalidJSON(t *testing.T) {
+	fix := startFixture(t)
+	fix.fs.WriteFile("bad.json", []byte("{not valid json"), 0)
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("expected panic from Exit on error with invalid JSON")
+		}
+	}()
+	RunCommandWithConfig(fix.cfg, fix.fs, fix.op, []string{"monitor", "preview-query", "bad.json"}, fix.hc)
+}
+
+func TestCmdMonitorPreviewInvalidJSON(t *testing.T) {
+	fix := startFixture(t)
+	fix.fs.WriteFile("bad2.json", []byte("{not valid json"), 0)
+	defer func() {
+		if r := recover(); r == nil {
+			t.Error("expected panic from Exit on error with invalid JSON")
+		}
+	}()
+	RunCommandWithConfig(fix.cfg, fix.fs, fix.op, []string{"monitor", "preview", "bad2.json"}, fix.hc)
+}
+
+func TestCmdMonitorAlarmsSingleGrouping(t *testing.T) {
+	// Verify that alarms with a single grouping are properly included in the table output
+	fix := startFixture(t,
+		testRequest{"/v1/meta", 200, `{"data":{"searchMonitorV2Alarms":{"alarms":[
+			{"id":"alarm-single","monitorId":"mon-001","level":"critical","status":"active","startTime":"2024-06-01T00:00:00Z","endTime":"","groupings":[{"name":"host","value":"prod-web-01"}]}
+		]}}}`},
+	)
+	RunCommandWithConfig(fix.cfg, fix.fs, fix.op, []string{"monitor", "alarms"}, fix.hc)
+	if diff := fix.op.ErrorBuf.String(); diff != "" {
+		t.Error("unexpected error output:", diff)
+	}
+	out := fix.op.OutputBuf.String()
+	if !strings.Contains(out, "alarm-single") {
+		t.Error("expected alarm id in output:", out)
+	}
+	if !strings.Contains(out, "critical") {
+		t.Error("expected level in output:", out)
+	}
+}
+
+func TestMonitorV2FromObjectHelper(t *testing.T) {
+	m := object{
+		"id":          "mon-test",
+		"name":        "Test Monitor",
+		"description": "A test",
+		"disabled":    true,
+		"updatedDate": "2024-01-01T00:00:00Z",
+	}
+	o := monitorV2FromObject(m)
+	if o.Id != "mon-test" {
+		t.Errorf("expected Id 'mon-test', got %q", o.Id)
+	}
+	if o.Name != "Test Monitor" {
+		t.Errorf("expected Name 'Test Monitor', got %q", o.Name)
+	}
+	if o.Description != "A test" {
+		t.Errorf("expected Description 'A test', got %q", o.Description)
+	}
+	if o.Disabled != "true" {
+		t.Errorf("expected Disabled 'true', got %q", o.Disabled)
+	}
+	if o.UpdatedDate != "2024-01-01T00:00:00Z" {
+		t.Errorf("expected UpdatedDate '2024-01-01T00:00:00Z', got %q", o.UpdatedDate)
+	}
+}
+
+func TestMonitorV2FromObjectHelperNilFields(t *testing.T) {
+	// Ensure monitorV2FromObject handles nil field values without panicking
+	m := object{
+		"id":   nil,
+		"name": nil,
+	}
+	o := monitorV2FromObject(m)
+	if o.Id != "" {
+		t.Errorf("expected empty Id, got %q", o.Id)
+	}
+	if o.Name != "" {
+		t.Errorf("expected empty Name, got %q", o.Name)
+	}
+}
+
+func TestCmdGetMonitorDefinitionJSON(t *testing.T) {
+	// Verify that the definition field is marshalled to JSON in get output
+	fix := startFixture(t,
+		testRequest{"/v1/meta", 200, `{"data":{"monitorV2":{
+			"id":"mon-def",
+			"name":"Def Monitor",
+			"description":"",
+			"disabled":false,
+			"updatedDate":"2024-01-01T00:00:00Z",
+			"definition":{"compareFunction":"GREATER","countAggFunction":"COUNT","threshold":100}
+		}}}`},
+	)
+	RunCommandWithConfig(fix.cfg, fix.fs, fix.op, []string{"get", "monitor", "mon-def"}, fix.hc)
+	if diff := fix.op.ErrorBuf.String(); diff != "" {
+		t.Error("unexpected error output:", diff)
+	}
+	out := fix.op.OutputBuf.String()
+	if !strings.Contains(out, "mon-def") {
+		t.Error("expected id in output:", out)
+	}
+	// The definition should appear as JSON in the state section
+	if !strings.Contains(out, "GREATER") {
+		t.Error("expected definition content in output:", out)
+	}
+}
+
+func TestCmdMonitorPreviewQueryEmptyFields(t *testing.T) {
+	// Verify empty result schema fields array is handled gracefully
+	fix := startFixture(t,
+		testRequest{"/v1/meta", 200, `{"data":{"evaluateMonitorV2Source":{
+			"pipeline":"filter true",
+			"resultSchema":{"fields":[]}
+		}}}`},
+	)
+	input := `{"name":"Empty Schema","ruleKind":"COUNT","definition":{"compareFunction":"GREATER","threshold":0}}`
+	fix.fs.WriteFile("empty_schema.json", []byte(input), 0)
+	RunCommandWithConfig(fix.cfg, fix.fs, fix.op, []string{"monitor", "preview-query", "empty_schema.json"}, fix.hc)
+	if diff := fix.op.ErrorBuf.String(); diff != "" {
+		t.Error("unexpected error output:", diff)
+	}
+	out := fix.op.OutputBuf.String()
+	if !strings.Contains(out, "filter true") {
+		t.Error("expected pipeline in output:", out)
+	}
+}
+
+func TestCmdMonitorAlarmsNoSamples(t *testing.T) {
+	// Alarm result set with nil groupings field
+	fix := startFixture(t,
+		testRequest{"/v1/meta", 200, `{"data":{"searchMonitorV2Alarms":{"alarms":[
+			{"id":"alarm-nogroupings","monitorId":"mon-001","level":"warning","status":"resolved","startTime":"2024-06-01T00:00:00Z","endTime":"2024-06-01T01:00:00Z","groupings":null}
+		]}}}`},
+	)
+	RunCommandWithConfig(fix.cfg, fix.fs, fix.op, []string{"monitor", "alarms"}, fix.hc)
+	if diff := fix.op.ErrorBuf.String(); diff != "" {
+		t.Error("unexpected error output:", diff)
+	}
+	out := fix.op.OutputBuf.String()
+	if !strings.Contains(out, "alarm-nogroupings") {
+		t.Error("expected alarm id in output:", out)
+	}
+}
