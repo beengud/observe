@@ -6,12 +6,14 @@ import (
 
 // gqlValidateIngestFilter validates an OPAL ingest filter expression against a dataset.
 // The --dataset flag is registered on the parent opal FlagSet as flagOpalDataset (cmd_opal.go).
+//
+// Actual API schema: validateIngestFilterExpression returns [TaskResultError!] where
+// TaskResultError only has { message } (no severity or symbol fields).
+// A null result means the pipeline is valid; a non-empty array means errors.
 var gqlValidateIngestFilter = compileGqlQuery(
 	`query ValidateIngestFilter($pipeline: String!, $sourceDatasetID: ObjectId!) {
 		validateIngestFilterExpression(pipeline: $pipeline, sourceDatasetID: $sourceDatasetID) {
 			message
-			severity
-			symbol { offset line column length }
 		}
 	}`,
 	"data", "validateIngestFilterExpression",
@@ -34,7 +36,7 @@ func cmdOpalValidateIngest(fa FuncArgs) error {
 		return err
 	}
 
-	// Result is an array of diagnostic messages (may be null/empty for success)
+	// A null result means valid. A non-empty array means errors.
 	var hasErrors bool
 	if result != nil {
 		diags, ok := result.(array)
@@ -50,14 +52,8 @@ func cmdOpalValidateIngest(fa FuncArgs) error {
 				continue
 			}
 			msg, _ := m["message"].(string)
-			severity, _ := m["severity"].(string)
-			sym := extractSymbol(m["symbol"])
-			if severity == "error" || severity == "ERROR" {
-				fmt.Fprintf(fa.op, "ERROR %d:%d: %s\n", sym.line, sym.column, msg)
-				hasErrors = true
-			} else {
-				fmt.Fprintf(fa.op, "WARN %s: %s\n", severity, msg)
-			}
+			fmt.Fprintf(fa.op, "ERROR: %s\n", msg)
+			hasErrors = true
 		}
 	}
 

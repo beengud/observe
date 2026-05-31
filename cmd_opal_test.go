@@ -6,13 +6,14 @@ import (
 )
 
 // checkQueriesResponse builds a mock GraphQL response for the checkQueries operation.
-func checkQueriesResponse(errorsJSON, warningsJSON, fieldsJSON string) string {
-	return `{"data":{"checkQueries":{"parsedPipeline":{"errors":` + errorsJSON + `,"warnings":` + warningsJSON + `},"resultSchema":{"fields":` + fieldsJSON + `}}}}`
+// The API returns an array at checkQueries level; errors use {col, row, text} not {message, severity, symbol}.
+func checkQueriesResponse(errorsJSON, warningsJSON, fieldListJSON string) string {
+	return `{"data":{"checkQueries":[{"parsedPipeline":{"errors":` + errorsJSON + `,"warnings":` + warningsJSON + `},"resultSchema":{"fieldList":` + fieldListJSON + `}}]}}`
 }
 
 func TestCmdOpalCheckSuccess(t *testing.T) {
 	fix := startFixture(t,
-		testRequest{"/v1/meta", 200, checkQueriesResponse("[]", "[]", `[{"name":"timestamp","type":"datetime"},{"name":"log","type":"string"}]`)},
+		testRequest{"/v1/meta", 200, checkQueriesResponse("[]", "[]", `[{"name":"timestamp"},{"name":"log"}]`)},
 	)
 	RunCommandWithConfig(fix.cfg, fix.fs, fix.op, []string{"opal", "check", "filter true"}, fix.hc)
 	fix.Assert()
@@ -27,30 +28,30 @@ func TestCmdOpalCheckSuccess(t *testing.T) {
 
 func TestCmdOpalCheckErrors(t *testing.T) {
 	resp := checkQueriesResponse(
-		`[{"message":"unknown verb","severity":"error","symbol":{"offset":0,"line":1,"column":1,"length":3}}]`,
+		`[{"col":"1","row":"1","text":"not_a_verb"}]`,
 		"[]",
-		"[]",
+		"null",
 	)
 	fix := startFixture(t,
 		testRequest{"/v1/meta", 200, resp},
 	)
 	mustPanic(t, func() {
-		RunCommandWithConfig(fix.cfg, fix.fs, fix.op, []string{"opal", "check", "bad_verb 123"}, fix.hc)
+		RunCommandWithConfig(fix.cfg, fix.fs, fix.op, []string{"opal", "check", "not_a_verb 123"}, fix.hc)
 	})
 	fix.Assert()
 	out := fix.op.OutputBuf.String()
 	if !strings.Contains(out, "ERROR") {
 		t.Errorf("expected ERROR in output, got: %q", out)
 	}
-	if !strings.Contains(out, "unknown verb") {
-		t.Errorf("expected error message in output, got: %q", out)
+	if !strings.Contains(out, "not_a_verb") {
+		t.Errorf("expected error text in output, got: %q", out)
 	}
 }
 
 func TestCmdOpalCheckWarnings(t *testing.T) {
 	resp := checkQueriesResponse(
 		"[]",
-		`[{"kind":"deprecation","message":"this is deprecated","symbol":{"offset":0,"line":1,"column":1,"length":5}}]`,
+		`[{"kind":"deprecation","symbol":{"col":"1","row":"1"}}]`,
 		"[]",
 	)
 	fix := startFixture(t,
@@ -87,17 +88,13 @@ func TestCmdOpalCheckUnknownSubcommand(t *testing.T) {
 }
 
 func TestCmdOpalCheckFile(t *testing.T) {
-	resp := checkQueriesResponse("[]", "[]", `[]`)
-	fix := startFixture(t,
-		testRequest{"/v1/meta", 200, resp},
-	)
-	// Write pipeline to fake FS — note: cmdOpalCheck uses os.ReadFile for --file,
-	// so we use a real temp file here via the standard library.
-	// The fake FS is not used for --file reads in the current implementation.
-	// This test just verifies the flag path fails gracefully with a bad file.
+	// This test just verifies the flag path fails gracefully with a bad file (before HTTP call).
+	fix := startFixture(t)
+	flagOpalFile = ""
 	mustPanic(t, func() {
 		RunCommandWithConfig(fix.cfg, fix.fs, fix.op, []string{"opal", "check", "--file", "/nonexistent/path/opal.txt"}, fix.hc)
 	})
+	flagOpalFile = "" // reset after parse so subsequent tests are not affected
 	// No HTTP requests should have been made (error before network call)
 	if fix.rix != 0 {
 		t.Errorf("expected 0 HTTP requests, got %d", fix.rix)
@@ -110,4 +107,26 @@ func TestCmdOpalNoSubcommand(t *testing.T) {
 		RunCommandWithConfig(fix.cfg, fix.fs, fix.op, []string{"opal"}, fix.hc)
 	})
 	fix.Assert()
+}
+
+// TestCmdOpalCheckEmptyTextError verifies that errors with empty text (from compilation
+// without an input dataset) are treated as OK rather than as real errors.
+func TestCmdOpalCheckEmptyTextError(t *testing.T) {
+	flagOpalFile = "" // ensure --file flag is not set from a previous test
+	// This simulates what the live API returns for "filter true" without an input dataset.
+	resp := checkQueriesResponse(
+		`[{"col":"0","row":"0","text":""}]`,
+		"[]",
+		"null",
+	)
+	fix := startFixture(t,
+		testRequest{"/v1/meta", 200, resp},
+	)
+	RunCommandWithConfig(fix.cfg, fix.fs, fix.op, []string{"opal", "check", "filter true"}, fix.hc)
+	fix.Assert()
+	out := fix.op.OutputBuf.String()
+	// Empty-text errors are skipped; should still print OK
+	if !strings.Contains(out, "OK") {
+		t.Errorf("expected OK for empty-text error (compilation without input), got: %q", out)
+	}
 }

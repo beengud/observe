@@ -6,13 +6,14 @@ import (
 )
 
 // verbsAndFunctionsResponse builds a mock GraphQL response for verbsAndFunctions.
+// The actual API uses "categories" (array) not "category" (single string).
 func verbsAndFunctionsResponse(verbsJSON, functionsJSON string) string {
 	return `{"data":{"verbsAndFunctions":{"verbs":` + verbsJSON + `,"functions":` + functionsJSON + `}}}`
 }
 
 func TestCmdOpalVerbs(t *testing.T) {
 	resp := verbsAndFunctionsResponse(
-		`[{"name":"filter","description":"Filter rows","category":"row"},{"name":"aggregate","description":"Aggregate rows","category":"aggregation"},{"name":"limit","description":"Limit rows","category":"row"}]`,
+		`[{"name":"filter","description":"Filter rows","categories":["Filter"]},{"name":"aggregate","description":"Aggregate rows","categories":["Aggregate"]},{"name":"limit","description":"Limit rows","categories":["Filter"]}]`,
 		`[]`,
 	)
 	fix := startFixture(t,
@@ -35,12 +36,16 @@ func TestCmdOpalVerbs(t *testing.T) {
 	if !strings.Contains(out, "\t") {
 		t.Errorf("expected tab-separated output, got: %q", out)
 	}
+	// Verify category is shown
+	if !strings.Contains(out, "Filter") {
+		t.Errorf("expected category 'Filter' in output, got: %q", out)
+	}
 }
 
 func TestCmdOpalFunctions(t *testing.T) {
 	resp := verbsAndFunctionsResponse(
 		`[]`,
-		`[{"name":"sum","description":"Sum values","category":"aggregation","returnType":"float64"},{"name":"count","description":"Count rows","category":"aggregation","returnType":"int64"},{"name":"avg","description":"Average values","category":"aggregation","returnType":"float64"}]`,
+		`[{"name":"sum","description":"Sum values","categories":["Aggregation"],"returnType":"float64"},{"name":"count","description":"Count rows","categories":["Aggregation"],"returnType":"int64"},{"name":"avg","description":"Average values","categories":["Aggregation"],"returnType":"float64"}]`,
 	)
 	fix := startFixture(t,
 		testRequest{"/v1/meta", 200, resp},
@@ -91,5 +96,23 @@ func TestCmdOpalFunctionsEmpty(t *testing.T) {
 	out := fix.op.OutputBuf.String()
 	if out != "" {
 		t.Errorf("expected empty output for empty functions, got: %q", out)
+	}
+}
+
+// TestCmdOpalVerbsMultipleCategories verifies that verbs with multiple categories
+// display them comma-separated.
+func TestCmdOpalVerbsMultipleCategories(t *testing.T) {
+	resp := verbsAndFunctionsResponse(
+		`[{"name":"aggregate","description":"Aggregate rows","categories":["Metrics","Aggregate"]}]`,
+		`[]`,
+	)
+	fix := startFixture(t,
+		testRequest{"/v1/meta", 200, resp},
+	)
+	RunCommandWithConfig(fix.cfg, fix.fs, fix.op, []string{"opal", "verbs"}, fix.hc)
+	fix.Assert()
+	out := fix.op.OutputBuf.String()
+	if !strings.Contains(out, "Metrics,Aggregate") {
+		t.Errorf("expected comma-separated categories in output, got: %q", out)
 	}
 }

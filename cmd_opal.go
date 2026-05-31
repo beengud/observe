@@ -49,40 +49,45 @@ func cmdOpal(fa FuncArgs) error {
 // cmdOpalValidateIngest is implemented in cmd_opal_validate.go (issue #7).
 
 // gqlCheckQueries validates an OPAL pipeline using the checkQueries GraphQL operation.
+//
+// Actual API schema (discovered via integration tests):
+//   - Input: MultiStageQueryInput { outputStage: String!, stages: [StageQueryInput!]! }
+//   - StageQueryInput: { stageID: String!, pipeline: String!, input: [InputDefinitionInput!]! }
+//   - Returns: [CompilationResult!]  (array, one per stage)
+//   - CompilationResult.parsedPipeline.errors: [PipelineSymbol!] { col, row, text, type }
+//   - CompilationResult.parsedPipeline.warnings: [PipelineWarning!] { kind, symbol { col, row, text } }
+//   - CompilationResult.resultSchema.fieldList: [{ name }]
+//   - Errors with text=="" mean "compilation requires an input dataset" (not a real syntax error)
 var gqlCheckQueries = compileGqlQuery(
-	`query CheckQueries($queries: MultiStageQueryInput!, $params: QueryParams) {
-		checkQueries(queries: $queries, params: $params) {
+	`query CheckQueries($queries: MultiStageQueryInput!) {
+		checkQueries(queries: $queries) {
 			parsedPipeline {
-				errors { message severity symbol { offset line column length } }
-				warnings { kind message symbol { offset line column length } }
+				errors { col row text }
+				warnings { kind symbol { col row } }
 			}
-			resultSchema { fields { name type } }
+			resultSchema { fieldList { name } }
 		}
 	}`,
-	"data", "checkQueries",
+	"data", "checkQueries", "0",
 )
 
-// opalSymbol holds position info from the API response.
-type opalSymbol struct {
-	line   int
-	column int
+// opalPos holds row:col position info from the API response.
+type opalPos struct {
+	row string
+	col string
 }
 
-func extractSymbol(sym any) opalSymbol {
-	s := opalSymbol{}
+func extractPos(sym any) opalPos {
+	p := opalPos{}
 	if m, ok := sym.(object); ok {
-		if v, ok := m["line"]; ok && v != nil {
-			if f, ok := v.(float64); ok {
-				s.line = int(f)
-			}
+		if v, ok := m["row"].(string); ok {
+			p.row = v
 		}
-		if v, ok := m["column"]; ok && v != nil {
-			if f, ok := v.(float64); ok {
-				s.column = int(f)
-			}
+		if v, ok := m["col"].(string); ok {
+			p.col = v
 		}
 	}
-	return s
+	return p
 }
 
 func cmdOpalCheck(fa FuncArgs) error {
@@ -100,12 +105,14 @@ func cmdOpalCheck(fa FuncArgs) error {
 		return ObserveError{Msg: "usage: observe opal check <pipeline> | observe opal check --file <path>"}
 	}
 
-	stageQuery := object{
+	stage := object{
 		"stageID":  "stage-1",
 		"pipeline": pipeline,
+		"input":    array{},
 	}
 	queries := object{
-		"stageQueries": array{stageQuery},
+		"outputStage": "stage-1",
+		"stages":      array{stage},
 	}
 
 	result, err := gqlCheckQueries.query(fa.cfg, fa.op, fa.hc, object{"queries": queries})
@@ -127,7 +134,11 @@ func cmdOpalCheck(fa FuncArgs) error {
 		if errList, ok := pp["errors"].(array); ok {
 			for _, e := range errList {
 				if m, ok := e.(object); ok {
-					errors = append(errors, m)
+					// Skip errors with empty text — these indicate "compilation requires an input
+					// dataset" and are not real syntax errors in the pipeline itself.
+					if text, _ := m["text"].(string); text != "" {
+						errors = append(errors, m)
+					}
 				}
 			}
 		}
@@ -142,28 +153,29 @@ func cmdOpalCheck(fa FuncArgs) error {
 
 	if len(errors) > 0 {
 		for _, e := range errors {
-			msg, _ := e["message"].(string)
-			sym := extractSymbol(e["symbol"])
-			fmt.Fprintf(fa.op, "ERROR %d:%d: %s\n", sym.line, sym.column, msg)
+			text, _ := e["text"].(string)
+			row, _ := e["row"].(string)
+			col, _ := e["col"].(string)
+			fmt.Fprintf(fa.op, "ERROR %s:%s: %s\n", row, col, text)
 		}
 		return ObserveError{Msg: "opal check: pipeline has errors"}
 	}
 
 	for _, w := range warnings {
-		msg, _ := w["message"].(string)
 		kind, _ := w["kind"].(string)
-		fmt.Fprintf(fa.op, "WARN %s: %s\n", kind, msg)
+		sym, _ := w["symbol"].(object)
+		pos := extractPos(sym)
+		fmt.Fprintf(fa.op, "WARN %s %s:%s\n", kind, pos.row, pos.col)
 	}
 
 	// Print OK and optionally the result schema fields
 	fmt.Fprintf(fa.op, "OK\n")
 	if schema, ok := res["resultSchema"].(object); ok {
-		if fields, ok := schema["fields"].(array); ok {
+		if fields, ok := schema["fieldList"].(array); ok {
 			for _, f := range fields {
 				if fm, ok := f.(object); ok {
 					name, _ := fm["name"].(string)
-					typ, _ := fm["type"].(string)
-					fmt.Fprintf(fa.op, "  %s\t%s\n", name, typ)
+					fmt.Fprintf(fa.op, "  %s\n", name)
 				}
 			}
 		}
