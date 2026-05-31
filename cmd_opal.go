@@ -8,8 +8,9 @@ import (
 )
 
 var (
-	flagsOpal     *pflag.FlagSet
-	flagOpalFile  string
+	flagsOpal       *pflag.FlagSet
+	flagOpalFile    string
+	flagOpalDataset string
 )
 
 var ErrOpalUsage = ObserveError{Msg: "usage: observe opal <check|verbs|functions|validate-ingest> [args...]"}
@@ -17,6 +18,7 @@ var ErrOpalUsage = ObserveError{Msg: "usage: observe opal <check|verbs|functions
 func init() {
 	flagsOpal = pflag.NewFlagSet("opal", pflag.ContinueOnError)
 	flagsOpal.StringVarP(&flagOpalFile, "file", "f", "", "Read OPAL pipeline from file instead of argument")
+	flagsOpal.StringVar(&flagOpalDataset, "dataset", "", "Source dataset ID for validate-ingest subcommand")
 	RegisterCommand(&Command{
 		Name:  "opal",
 		Help:  "Validate and inspect OPAL pipelines and functions.",

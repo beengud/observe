@@ -2,21 +2,10 @@ package main
 
 import (
 	"fmt"
-
-	"github.com/spf13/pflag"
 )
-
-var (
-	flagsOpalValidate   *pflag.FlagSet
-	flagOpalDatasetID   string
-)
-
-func init() {
-	flagsOpalValidate = pflag.NewFlagSet("opal-validate", pflag.ContinueOnError)
-	flagsOpalValidate.StringVar(&flagOpalDatasetID, "dataset", "", "Source dataset ID for ingest filter validation")
-}
 
 // gqlValidateIngestFilter validates an OPAL ingest filter expression against a dataset.
+// The --dataset flag is registered on the parent opal FlagSet as flagOpalDataset (cmd_opal.go).
 var gqlValidateIngestFilter = compileGqlQuery(
 	`query ValidateIngestFilter($pipeline: String!, $sourceDatasetID: ObjectId!) {
 		validateIngestFilterExpression(pipeline: $pipeline, sourceDatasetID: $sourceDatasetID) {
@@ -29,24 +18,17 @@ var gqlValidateIngestFilter = compileGqlQuery(
 )
 
 func cmdOpalValidateIngest(fa FuncArgs) error {
-	// Parse flags from remaining args after "validate-ingest"
-	remaining := fa.args[2:]
-	if err := flagsOpalValidate.Parse(remaining); err != nil {
-		return fmt.Errorf("opal validate-ingest: %w", err)
-	}
-	pipelineArgs := flagsOpalValidate.Args()
-
-	if flagOpalDatasetID == "" {
+	if flagOpalDataset == "" {
 		return ObserveError{Msg: "usage: observe opal validate-ingest --dataset <dataset-id> <pipeline>"}
 	}
-	if len(pipelineArgs) == 0 {
+	if len(fa.args) < 3 {
 		return ObserveError{Msg: "usage: observe opal validate-ingest --dataset <dataset-id> <pipeline>"}
 	}
-	pipeline := pipelineArgs[0]
+	pipeline := fa.args[2]
 
 	result, err := gqlValidateIngestFilter.query(fa.cfg, fa.op, fa.hc, object{
 		"pipeline":        pipeline,
-		"sourceDatasetID": flagOpalDatasetID,
+		"sourceDatasetID": flagOpalDataset,
 	})
 	if err != nil {
 		return err
