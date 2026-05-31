@@ -22,9 +22,11 @@ import (
 
 const integrationWorkspaceId = "42379913"
 
-// integrationConfig returns a Config for the live tenant.
+// integrationMonitorConfig returns a Config for the live tenant.
 // It reads from the default profile in observe.yaml.
-func integrationConfig(t *testing.T) *Config {
+// (Named integrationMonitorConfig to avoid collision with integrationConfig
+// defined in cmd_dataset_integration_test.go.)
+func integrationMonitorConfig(t *testing.T) *Config {
 	t.Helper()
 	cfg := &Config{}
 	configPath := GetConfigFilePath()
@@ -43,7 +45,7 @@ func integrationConfig(t *testing.T) *Config {
 // TestIntegrationListMonitors verifies that searchMonitorV2 returns without error.
 // The result may be empty; that is acceptable.
 func TestIntegrationListMonitors(t *testing.T) {
-	cfg := integrationConfig(t)
+	cfg := integrationMonitorConfig(t)
 	op := NewCaptureOutput()
 	hc := &http.Client{}
 
@@ -91,7 +93,7 @@ func TestIntegrationListMonitors(t *testing.T) {
 // TestIntegrationSearchAlarms verifies that searchMonitorV2Alarms returns
 // without error for the last 24 hours in the default workspace.
 func TestIntegrationSearchAlarms(t *testing.T) {
-	cfg := integrationConfig(t)
+	cfg := integrationMonitorConfig(t)
 	op := NewCaptureOutput()
 	hc := &http.Client{}
 
@@ -120,7 +122,7 @@ func TestIntegrationSearchAlarms(t *testing.T) {
 // This test is skipped if the API returns an error (e.g. the stub input
 // references a dataset that doesn't exist in the tenant).
 func TestIntegrationPreviewQuery(t *testing.T) {
-	cfg := integrationConfig(t)
+	cfg := integrationMonitorConfig(t)
 	op := NewCaptureOutput()
 	hc := &http.Client{}
 
@@ -152,7 +154,7 @@ func TestIntegrationPreviewQuery(t *testing.T) {
 // TestIntegrationPreview validates previewMonitorV2 against the stub input.
 // Skipped if the API returns an error or stub input is invalid for the tenant.
 func TestIntegrationPreview(t *testing.T) {
-	cfg := integrationConfig(t)
+	cfg := integrationMonitorConfig(t)
 	op := NewCaptureOutput()
 	hc := &http.Client{}
 
