@@ -112,7 +112,7 @@ func (*objectTypeBoard) GetPresentationLabels() []string { return []string{"id",
 func (*objectTypeBoard) GetProperties() []PropertyDesc   { return propertyDescBoard }
 
 var gqlListBoard = compileGqlQuery(
-	`query Board_List($workspaceId: [ObjectId!]!) {
+`query Board_List($workspaceId: [ObjectId!]!) {
 		dashboardSearch(terms: { workspaceId: $workspaceId }) {
 			dashboards {
 				score
@@ -123,19 +123,9 @@ var gqlListBoard = compileGqlQuery(
 	"data", "dashboardSearch", "dashboards",
 )
 
-func (ot *objectTypeBoard) List(cfg *Config, op Output, hc httpClient) ([]*ObjectInfo, error) {
-	workspaceId := cfg.WorkspaceIdOrName
-	if workspaceId == "" {
-		workspaceId = "42379913"
-	}
-	obj, err := gqlListBoard.query(cfg, op, hc, object{"workspaceId": []string{workspaceId}})
-	if err != nil || obj == nil {
-		return nil, err
-	}
-	items, ok := obj.(array)
-	if !ok {
-		return nil, fmt.Errorf("board list: unexpected response type")
-	}
+// unpackBoardItems extracts []*ObjectInfo from an array of dashboardSearch result items.
+// Each item is expected to have a "dashboard" sub-object.
+func unpackBoardItems(items array) []*ObjectInfo {
 	var ret []*ObjectInfo
 	for _, item := range items {
 		m, ok := item.(object)
@@ -165,11 +155,80 @@ func (ot *objectTypeBoard) List(cfg *Config, op Output, hc httpClient) ([]*Objec
 		}
 		ret = append(ret, o.GetInfo())
 	}
-	return ret, nil
+	return ret
+}
+
+func (ot *objectTypeBoard) List(cfg *Config, op Output, hc httpClient) ([]*ObjectInfo, error) {
+	// If any search flags are set, delegate to Search with those terms.
+	// The global --workspace flag populates cfg.WorkspaceIdOrName for workspace filtering.
+	if flagBoardScaffold != "" || flagBoardSearchFolder != "" {
+		terms := BoardSearchTerms{
+			Name:        flagBoardScaffold,
+			WorkspaceId: cfg.WorkspaceIdOrName,
+			FolderId:    flagBoardSearchFolder,
+		}
+		return ot.Search(cfg, op, hc, terms)
+	}
+	workspaceId := cfg.WorkspaceIdOrName
+	if workspaceId == "" {
+		workspaceId = "42379913"
+	}
+	obj, err := gqlListBoard.query(cfg, op, hc, object{"workspaceId": []string{workspaceId}})
+	if err != nil || obj == nil {
+		return nil, err
+	}
+	items, ok := obj.(array)
+	if !ok {
+		return nil, fmt.Errorf("board list: unexpected response type")
+	}
+	return unpackBoardItems(items), nil
+}
+
+// BoardSearchTerms holds optional search parameters for dashboardSearch.
+type BoardSearchTerms struct {
+	Name        string
+	WorkspaceId string
+	FolderId    string
+}
+
+var gqlSearchBoard = compileGqlQuery(
+`query Board_Search($terms: DWSearchInput!, $maxCount: Int) {
+		dashboardSearch(terms: $terms, maxCount: $maxCount) {
+			results {
+				dashboard { id name workspaceId updatedDate }
+				score
+			}
+		}
+	}`,
+	"data", "dashboardSearch", "results",
+)
+
+// Search queries dashboardSearch using optional name/workspace/folder filters.
+// Results are presented the same way as List.
+func (ot *objectTypeBoard) Search(cfg *Config, op Output, hc httpClient, terms BoardSearchTerms) ([]*ObjectInfo, error) {
+	termMap := object{}
+	if terms.Name != "" {
+		termMap["name"] = terms.Name
+	}
+	if terms.WorkspaceId != "" {
+		termMap["workspaceId"] = terms.WorkspaceId
+	}
+	if terms.FolderId != "" {
+		termMap["folderId"] = terms.FolderId
+	}
+	obj, err := gqlSearchBoard.query(cfg, op, hc, object{"terms": termMap})
+	if err != nil || obj == nil {
+		return nil, err
+	}
+	items, ok := obj.(array)
+	if !ok {
+		return nil, fmt.Errorf("board search: unexpected response type")
+	}
+	return unpackBoardItems(items), nil
 }
 
 var gqlGetBoard = compileGqlQuery(
-	`query Board_Get($id: ObjectId!) {
+`query Board_Get($id: ObjectId!) {
 		dashboard(id: $id) {
 			id
 			name
@@ -229,7 +288,7 @@ func (ot *objectTypeBoard) Get(cfg *Config, op Output, hc httpClient, id string)
 }
 
 var gqlDeleteBoard = compileGqlQuery(
-	`mutation Board_Delete($id: ObjectId!) {
+`mutation Board_Delete($id: ObjectId!) {
 		deleteDashboard(id: $id) {
 			success
 			errorMessage

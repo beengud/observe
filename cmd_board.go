@@ -8,19 +8,21 @@ import (
 )
 
 var (
-	flagsBoard         *pflag.FlagSet
-	flagBoardScaffold  string
+	flagsBoard            *pflag.FlagSet
+	flagBoardScaffold     string
+	flagBoardSearchFolder string
 )
 
-var ErrBoardUsage = ObserveError{Msg: "usage: observe board <create|update|scaffold> [args...]"}
+var ErrBoardUsage = ObserveError{Msg: "usage: observe board <create|update|scaffold|set-default|clear-default> [args...]"}
 
 func init() {
 	flagsBoard = pflag.NewFlagSet("board", pflag.ContinueOnError)
 	flagBoardScaffold = ""
-	flagsBoard.StringVar(&flagBoardScaffold, "name", "", "Name to use when scaffolding a board template")
+	flagsBoard.StringVar(&flagBoardScaffold, "name", "", "Filter boards by name when listing, or set name when scaffolding")
+	flagsBoard.StringVar(&flagBoardSearchFolder, "folder", "", "Filter boards by folder ID when listing")
 	RegisterCommand(&Command{
 		Name:  "board",
-		Help:  "Create, update, or scaffold a board (dashboard).",
+		Help:  "Create, update, scaffold, or set/clear defaults for a board (dashboard).",
 		Flags: flagsBoard,
 		Func:  cmdBoard,
 	})
@@ -37,13 +39,17 @@ func cmdBoard(fa FuncArgs) error {
 		return cmdBoardUpdate(fa)
 	case "scaffold":
 		return cmdBoardScaffold(fa)
+	case "set-default":
+		return cmdBoardSetDefault(fa)
+	case "clear-default":
+		return cmdBoardClearDefault(fa)
 	default:
-		return ObserveError{Msg: fmt.Sprintf("unknown board subcommand %q; expected create, update, or scaffold", fa.args[1])}
+		return ObserveError{Msg: fmt.Sprintf("unknown board subcommand %q; expected create, update, scaffold, set-default, or clear-default", fa.args[1])}
 	}
 }
 
 var gqlSaveBoard = compileGqlQuery(
-	`mutation Board_Save($input: DashboardInput!) {
+`mutation Board_Save($input: DashboardInput!) {
 		saveDashboard(dash: $input) {
 			id
 			name
@@ -201,6 +207,77 @@ func cmdBoardScaffold(fa FuncArgs) error {
 	enc := json.NewEncoder(fa.op)
 	enc.SetIndent("", "  ")
 	return enc.Encode(tmpl)
+}
+
+var gqlSetDefaultDashboard = compileGqlQuery(
+`mutation Board_SetDefault($dsid: ObjectId!, $dashid: ObjectId!) {
+		setDefaultDashboard(dsid: $dsid, dashid: $dashid) {
+			success
+			errorMessage
+		}
+	}`,
+	"data", "setDefaultDashboard",
+)
+
+var gqlClearDefaultDashboard = compileGqlQuery(
+`mutation Board_ClearDefault($dsid: ObjectId!) {
+		clearDefaultDashboard(dsid: $dsid) {
+			success
+			errorMessage
+		}
+	}`,
+	"data", "clearDefaultDashboard",
+)
+
+func cmdBoardSetDefault(fa FuncArgs) error {
+	if len(fa.args) != 4 {
+		return ObserveError{Msg: "usage: observe board set-default <dataset-id> <board-id>"}
+	}
+	datasetId := fa.args[2]
+	boardId := fa.args[3]
+	obj, err := gqlSetDefaultDashboard.query(fa.cfg, fa.op, fa.hc, object{"dsid": datasetId, "dashid": boardId})
+	if err != nil {
+		return err
+	}
+	if obj == nil {
+		return fmt.Errorf("board set-default: no result returned")
+	}
+	result, ok := obj.(object)
+	if !ok {
+		return fmt.Errorf("board set-default: unexpected response type")
+	}
+	if errMsg, ok := result["errorMessage"]; ok && errMsg != nil {
+		if s, ok := errMsg.(string); ok && s != "" {
+			return fmt.Errorf("board set-default: %s", s)
+		}
+	}
+	fmt.Fprintf(fa.op, "Default dashboard set successfully\n")
+	return nil
+}
+
+func cmdBoardClearDefault(fa FuncArgs) error {
+	if len(fa.args) != 3 {
+		return ObserveError{Msg: "usage: observe board clear-default <dataset-id>"}
+	}
+	datasetId := fa.args[2]
+	obj, err := gqlClearDefaultDashboard.query(fa.cfg, fa.op, fa.hc, object{"dsid": datasetId})
+	if err != nil {
+		return err
+	}
+	if obj == nil {
+		return fmt.Errorf("board clear-default: no result returned")
+	}
+	result, ok := obj.(object)
+	if !ok {
+		return fmt.Errorf("board clear-default: unexpected response type")
+	}
+	if errMsg, ok := result["errorMessage"]; ok && errMsg != nil {
+		if s, ok := errMsg.(string); ok && s != "" {
+			return fmt.Errorf("board clear-default: %s", s)
+		}
+	}
+	fmt.Fprintf(fa.op, "Default dashboard cleared successfully\n")
+	return nil
 }
 
 func copyMap(m map[string]any) map[string]any {
