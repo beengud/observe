@@ -1,0 +1,5 @@
+{
+  "workspaceId": "42379913",
+  "dataset": { "name": "observe-cli-test-dryrun" },
+  "query": { "stageQueries": [{ "stageID": "main", "pipeline": "filter true" }] }
+}
