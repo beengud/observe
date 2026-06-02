@@ -114,9 +114,6 @@ var gqlListMonitorV2 = compileGqlQuery(
 
 func (ot *objectTypeMonitorV2) List(cfg *Config, op Output, hc httpClient) ([]*ObjectInfo, error) {
 	workspaceId := cfg.WorkspaceIdOrName
-	if workspaceId == "" {
-		workspaceId = "42379913"
-	}
 	args := object{"workspaceId": workspaceId}
 	obj, err := gqlListMonitorV2.query(cfg, op, hc, args)
 	if err != nil || obj == nil {

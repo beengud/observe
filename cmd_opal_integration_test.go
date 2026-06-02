@@ -9,22 +9,16 @@ import (
 	"testing"
 )
 
-// integrationOpalConfig returns a *Config using env vars with fallback to hardcoded CI values.
-// Note: defaultSite in cmd_dataset_integration_test.go includes the customer ID prefix which
-// causes a duplicate-prefix URL. We use "observeinc.com" as the bare site domain here since
-// SiteUrl() prepends CustomerIdStr automatically.
+// integrationOpalConfig returns a *Config from env vars.
+// SiteUrl() prepends CustomerIdStr + ".", so OBSERVE_SITE should be the bare domain (e.g. "observeinc.com").
 func integrationOpalConfig() *Config {
 	customerId := os.Getenv("OBSERVE_CUSTOMERID")
-	if customerId == "" {
-		customerId = defaultCustomerId
-	}
 	authToken := os.Getenv("OBSERVE_AUTHTOKEN")
-	if authToken == "" {
-		authToken = defaultAuthToken
+	if customerId == "" || authToken == "" {
+		panic("integration tests require OBSERVE_CUSTOMERID and OBSERVE_AUTHTOKEN env vars")
 	}
 	site := os.Getenv("OBSERVE_SITE")
 	if site == "" {
-		// SiteUrl() prepends CustomerIdStr + ".", so just use the bare domain.
 		site = "observeinc.com"
 	}
 	return &Config{
@@ -238,9 +232,11 @@ func TestIntegrationOpalValidateIngestGoodPipeline(t *testing.T) {
 	op := NewCaptureOutput()
 	hc := &http.Client{}
 
-	// Set the dataset flag for the validate-ingest call.
-	// Fleet dataset: Default.Observe Agent/Events (ID: 42918275)
-	flagOpalDataset = "42918275"
+	datasetId := os.Getenv("OBSERVE_DATASET_ID")
+	if datasetId == "" {
+		t.Skip("OBSERVE_DATASET_ID not set, skipping validate-ingest integration test")
+	}
+	flagOpalDataset = datasetId
 	defer func() { flagOpalDataset = "" }()
 
 	fa := FuncArgs{
@@ -279,7 +275,11 @@ func TestIntegrationOpalValidateIngestBadPipeline(t *testing.T) {
 	op := NewCaptureOutput()
 	hc := &http.Client{}
 
-	flagOpalDataset = "42918275"
+	datasetId := os.Getenv("OBSERVE_DATASET_ID")
+	if datasetId == "" {
+		t.Skip("OBSERVE_DATASET_ID not set, skipping validate-ingest integration test")
+	}
+	flagOpalDataset = datasetId
 	defer func() { flagOpalDataset = "" }()
 
 	fa := FuncArgs{

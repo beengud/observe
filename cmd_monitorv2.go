@@ -46,13 +46,10 @@ func cmdMonitor(fa FuncArgs) error {
 	}
 }
 
-// resolveMonitorWorkspace returns the workspace ID from config or default.
-// The global --workspace flag sets cfg.WorkspaceIdOrName.
+// resolveMonitorWorkspace returns the workspace ID from config.
+// Use the global --workspace flag to set the workspace.
 func resolveMonitorWorkspace(cfg *Config) string {
-	if cfg.WorkspaceIdOrName != "" {
-		return cfg.WorkspaceIdOrName
-	}
-	return "42379913"
+	return cfg.WorkspaceIdOrName
 }
 
 // readMonitorV2Input reads a MonitorV2Input JSON file from disk.

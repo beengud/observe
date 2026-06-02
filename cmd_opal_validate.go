@@ -5,11 +5,7 @@ import (
 )
 
 // gqlValidateIngestFilter validates an OPAL ingest filter expression against a dataset.
-// The --dataset flag is registered on the parent opal FlagSet as flagOpalDataset (cmd_opal.go).
-//
-// Actual API schema: validateIngestFilterExpression returns [TaskResultError!] where
-// TaskResultError only has { message } (no severity or symbol fields).
-// A null result means the pipeline is valid; a non-empty array means errors.
+// A null result means valid; a non-empty array means errors.
 var gqlValidateIngestFilter = compileGqlQuery(
 	`query ValidateIngestFilter($pipeline: String!, $sourceDatasetID: ObjectId!) {
 		validateIngestFilterExpression(pipeline: $pipeline, sourceDatasetID: $sourceDatasetID) {

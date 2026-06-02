@@ -9,24 +9,19 @@ import (
 	"testing"
 )
 
-const (
-	defaultCustomerId = "109601619518"
-	defaultAuthToken  = "fNJn-aQOmgOUeIvosyQBLjRiNBVBBSZz"
-	defaultSite       = "109601619518.observeinc.com"
-)
-
 func integrationConfig() *Config {
 	customerId := os.Getenv("OBSERVE_CUSTOMERID")
-	if customerId == "" {
-		customerId = defaultCustomerId
-	}
 	authToken := os.Getenv("OBSERVE_AUTHTOKEN")
-	if authToken == "" {
-		authToken = defaultAuthToken
+	site := os.Getenv("OBSERVE_SITE")
+	if customerId == "" || authToken == "" {
+		panic("integration tests require OBSERVE_CUSTOMERID and OBSERVE_AUTHTOKEN env vars")
+	}
+	if site == "" {
+		site = customerId + ".observeinc.com"
 	}
 	return &Config{
 		CustomerIdStr: customerId,
-		SiteStr:       defaultSite,
+		SiteStr:       site,
 		AuthtokenStr:  authToken,
 	}
 }

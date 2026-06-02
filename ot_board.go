@@ -170,9 +170,6 @@ func (ot *objectTypeBoard) List(cfg *Config, op Output, hc httpClient) ([]*Objec
 		return ot.Search(cfg, op, hc, terms)
 	}
 	workspaceId := cfg.WorkspaceIdOrName
-	if workspaceId == "" {
-		workspaceId = "42379913"
-	}
 	obj, err := gqlListBoard.query(cfg, op, hc, object{"workspaceId": []string{workspaceId}})
 	if err != nil || obj == nil {
 		return nil, err

@@ -143,7 +143,7 @@ func cmdBoardUpdate(fa FuncArgs) error {
 
 var boardScaffoldTemplate = map[string]any{
 	"name":        "My Dashboard",
-	"workspaceId": "42379913",
+	"workspaceId": "YOUR_WORKSPACE_ID",
 	"layout": map[string]any{
 		"autoPack": true,
 		"gridLayout": map[string]any{
@@ -192,7 +192,7 @@ var boardScaffoldTemplate = map[string]any{
 			"input": []any{
 				map[string]any{
 					"inputName": "main",
-					"datasetId": "42450596",
+					"datasetId": "YOUR_DATASET_ID",
 				},
 			},
 		},

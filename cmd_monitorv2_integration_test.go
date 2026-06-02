@@ -13,14 +13,10 @@ import (
 // Integration tests for Monitor V2 commands.
 // Run with: go test -tags integration ./...
 //
-// These tests connect to the live Observe tenant at
-// 109601619518.observeinc.com using workspace 42379913.
-// They require a valid OBSERVE_CONFIG or ~/.config/observe.yaml profile.
-//
-// Tests are designed to tolerate an empty monitor/alarm list so they
-// do not require pre-existing data to pass.
+// These tests require a valid observe.yaml profile (see --config flag).
+// Tests tolerate an empty monitor/alarm list; no pre-existing data required.
 
-const integrationWorkspaceId = "42379913"
+const integrationWorkspaceId = ""
 
 // integrationMonitorConfig returns a Config for the live tenant.
 // It reads from the default profile in observe.yaml.

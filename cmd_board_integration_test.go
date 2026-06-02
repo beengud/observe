@@ -5,14 +5,14 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"os"
 	"testing"
 )
 
-// TestIntegrationBoardList verifies that listing boards in workspace 42379913
-// returns at least one result without error.
+// TestIntegrationBoardList verifies that listing boards returns at least one result without error.
 func TestIntegrationBoardList(t *testing.T) {
 	cfg := integrationConfig()
-	cfg.WorkspaceIdOrName = "42379913"
+	cfg.WorkspaceIdOrName = os.Getenv("OBSERVE_WORKSPACE")
 	op := NewCaptureOutput()
 
 	infos, err := ObjectTypeBoard.List(cfg, op, http.DefaultClient)
@@ -40,7 +40,7 @@ func TestIntegrationBoardSearchByName(t *testing.T) {
 	ot := &objectTypeBoard{}
 	infos, err := ot.Search(cfg, op, http.DefaultClient, BoardSearchTerms{
 		Name:        "Deployment",
-		WorkspaceId: "42379913",
+		WorkspaceId: os.Getenv("OBSERVE_WORKSPACE"),
 	})
 	if err != nil {
 		t.Fatalf("board search failed: %v\nerrors: %s", err, op.ErrorBuf.String())
@@ -59,7 +59,7 @@ func TestIntegrationBoardSearchWithWorkspaceFilter(t *testing.T) {
 
 	ot := &objectTypeBoard{}
 	infos, err := ot.Search(cfg, op, http.DefaultClient, BoardSearchTerms{
-		WorkspaceId: "42379913",
+		WorkspaceId: os.Getenv("OBSERVE_WORKSPACE"),
 	})
 	if err != nil {
 		t.Fatalf("board search with workspace filter failed: %v", err)

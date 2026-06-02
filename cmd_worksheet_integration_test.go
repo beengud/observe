@@ -4,14 +4,14 @@ package main
 
 import (
 	"net/http"
+	"os"
 	"testing"
 )
 
-// TestIntegrationWorksheetList verifies that listing worksheets in workspace 42379913
-// returns no error (results may be empty).
+// TestIntegrationWorksheetList verifies that listing worksheets returns no error (results may be empty).
 func TestIntegrationWorksheetList(t *testing.T) {
 	cfg := integrationConfig()
-	cfg.WorkspaceIdOrName = "42379913"
+	cfg.WorkspaceIdOrName = os.Getenv("OBSERVE_WORKSPACE")
 	op := NewCaptureOutput()
 
 	infos, err := ObjectTypeWorksheet.List(cfg, op, http.DefaultClient)
@@ -31,13 +31,13 @@ func TestIntegrationWorksheetList(t *testing.T) {
 // via get, then deletes it as cleanup. The delete is always attempted.
 func TestIntegrationWorksheetCreateGetDelete(t *testing.T) {
 	cfg := integrationConfig()
-	cfg.WorkspaceIdOrName = "42379913"
+	cfg.WorkspaceIdOrName = os.Getenv("OBSERVE_WORKSPACE")
 	op := NewCaptureOutput()
 
 	// Create worksheet input.
 	input := object{
-		"name":        "Claude Integration Test Worksheet",
-		"workspaceId": "42379913",
+		"name":        "Integration Test Worksheet",
+		"workspaceId": os.Getenv("OBSERVE_WORKSPACE"),
 		"stages": []any{
 			object{
 				"stageID":  "s1",
@@ -82,8 +82,8 @@ func TestIntegrationWorksheetCreateGetDelete(t *testing.T) {
 		t.Fatal("worksheet get returned nil - worksheet not found after creation")
 	}
 	gotInfo := got.GetInfo()
-	if gotInfo.Name != "Claude Integration Test Worksheet" {
-		t.Errorf("expected name %q, got %q", "Claude Integration Test Worksheet", gotInfo.Name)
+	if gotInfo.Name != "Integration Test Worksheet" {
+		t.Errorf("expected name %q, got %q", "Integration Test Worksheet", gotInfo.Name)
 	}
 	t.Logf("Verified worksheet exists: id=%s name=%s", gotInfo.Id, gotInfo.Name)
 }
@@ -95,8 +95,8 @@ func TestIntegrationWorksheetSearchByName(t *testing.T) {
 	op := NewCaptureOutput()
 
 	termMap := object{
-		"workspaceId": "42379913",
-		"name":        "Claude",
+		"workspaceId": os.Getenv("OBSERVE_WORKSPACE"),
+		"name":        "Integration Test",
 	}
 	obj, err := gqlWorksheetSearch.query(cfg, op, http.DefaultClient, object{"terms": termMap})
 	if err != nil {

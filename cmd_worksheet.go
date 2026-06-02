@@ -46,9 +46,6 @@ func cmdWorksheet(fa FuncArgs) error {
 
 func cmdWorksheetList(fa FuncArgs) error {
 	workspaceId := fa.cfg.WorkspaceIdOrName
-	if workspaceId == "" {
-		workspaceId = "42379913"
-	}
 	termMap := object{"workspaceId": workspaceId}
 	if flagWorksheetName != "" {
 		termMap["name"] = flagWorksheetName
