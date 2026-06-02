@@ -45,19 +45,8 @@ func cmdOpal(fa FuncArgs) error {
 	}
 }
 
-// cmdOpalVerbs and cmdOpalFunctions are implemented in ot_opal.go (issue #6).
-// cmdOpalValidateIngest is implemented in cmd_opal_validate.go (issue #7).
-
-// gqlCheckQueries validates an OPAL pipeline using the checkQueries GraphQL operation.
-//
-// Actual API schema (discovered via integration tests):
-//   - Input: MultiStageQueryInput { outputStage: String!, stages: [StageQueryInput!]! }
-//   - StageQueryInput: { stageID: String!, pipeline: String!, input: [InputDefinitionInput!]! }
-//   - Returns: [CompilationResult!]  (array, one per stage)
-//   - CompilationResult.parsedPipeline.errors: [PipelineSymbol!] { col, row, text, type }
-//   - CompilationResult.parsedPipeline.warnings: [PipelineWarning!] { kind, symbol { col, row, text } }
-//   - CompilationResult.resultSchema.fieldList: [{ name }]
-//   - Errors with text=="" mean "compilation requires an input dataset" (not a real syntax error)
+// gqlCheckQueries validates an OPAL pipeline via the checkQueries GraphQL operation.
+// Errors with empty text mean the pipeline requires an input dataset; they are suppressed.
 var gqlCheckQueries = compileGqlQuery(
 	`query CheckQueries($queries: MultiStageQueryInput!) {
 		checkQueries(queries: $queries) {

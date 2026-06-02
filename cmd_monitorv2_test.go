@@ -59,7 +59,7 @@ func TestCmdListMonitorDefaultWorkspace(t *testing.T) {
 	fix := startFixture(t,
 		testRequest{"/v1/meta", 200, `{"data":{"searchMonitorV2":{"monitors":[]}}}`},
 	)
-	// No workspace set in cfg, should use default 42379913
+	// No workspace set in cfg; empty workspaceId is passed to the API.
 	RunCommandWithConfig(fix.cfg, fix.fs, fix.op, []string{"list", "monitor"}, fix.hc)
 	if diff := fix.op.ErrorBuf.String(); diff != "" {
 		t.Error("unexpected error output:", diff)

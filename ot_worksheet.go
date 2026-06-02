@@ -109,9 +109,6 @@ var gqlWorksheetSearch = compileGqlQuery(
 
 func (ot *objectTypeWorksheet) List(cfg *Config, op Output, hc httpClient) ([]*ObjectInfo, error) {
 	workspaceId := cfg.WorkspaceIdOrName
-	if workspaceId == "" {
-		workspaceId = "42379913"
-	}
 	termMap := object{"workspaceId": workspaceId}
 	obj, err := gqlWorksheetSearch.query(cfg, op, hc, object{"terms": termMap})
 	if err != nil || obj == nil {

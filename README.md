@@ -1,5 +1,21 @@
 # Observe Command-line Tool
 
+> **Note:** This is a personal fork of [observeinc/observe](https://github.com/observeinc/observe)
+> maintained by [beengud](https://github.com/beengud). It adds the following commands
+> on top of the upstream CLI:
+>
+> - `observe board <create|update|scaffold|set-default|clear-default>` — Dashboard management
+> - `observe fleet <status|host|versions|auth>` — observe-agent fleet status
+> - `observe opal <check|verbs|functions|validate-ingest>` — OPAL pipeline validation and reference
+> - `observe worksheet <list|get|create|delete>` — Worksheet CRUD
+> - `observe monitor <preview-query|preview|alarms>` — Monitor V2
+> - `observe dataset <dry-run|impact>` — Dataset pipeline dry-run and impact analysis
+>
+> Bug fixes applied vs upstream: panic on unknown single-arg command; board workspaceId array
+> type; strip `updatedDate` from board input; normalize missing `stages[n].input` to `[]`.
+>
+> Generic improvements may be submitted upstream to observeinc/observe as separate PRs.
+
 This tool allows you to interact with an Observe tenant from the command line
 using the Observe API, without needing to use curl. Observe is a cloud based
 observability platform that models machine data to help you debug issues with
