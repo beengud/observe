@@ -1,0 +1,32 @@
+{
+  "name": "Integration Test Monitor - Count Stub",
+  "ruleKind": "COUNT",
+  "definition": {
+    "compareFunction": "GREATER_OR_EQUAL",
+    "countAggFunction": "COUNT",
+    "threshold": 1,
+    "lookbackTime": "PT5M",
+    "expressionSummary": "count >= 1 over last 5m",
+    "rule": {
+      "count": {
+        "compareFunction": "GREATER_OR_EQUAL",
+        "threshold": 1
+      }
+    },
+    "inputQuery": {
+      "outputStage": "query",
+      "stages": [
+        {
+          "id": "query",
+          "input": [
+            {
+              "inputName": "main",
+              "datasetPath": "Default.Observe Agent/Events"
+            }
+          ],
+          "pipeline": "limit 10"
+        }
+      ]
+    }
+  }
+}
