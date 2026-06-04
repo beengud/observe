@@ -1,0 +1,28 @@
+name: Sync to GitLab
+
+# Push to the GitLab mirror immediately after every merge to main.
+# This replaces the ~60-minute GitLab scheduled pull with near-instant sync.
+#
+# Required GitHub secret:
+#   GITLAB_SYNC_TOKEN  — GitLab project access token with write_repository scope
+#                        on gitlab.com/nhl/mop/observe (project ID 82778463)
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  sync:
+    name: Mirror → gitlab.com/nhl/mop/observe
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history + all refs)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push mirror to GitLab
+        run: |
+          git remote add gitlab \
+            "https://oauth2:${{ secrets.GITLAB_SYNC_TOKEN }}@gitlab.com/nhl/mop/observe.git"
+          git push gitlab --mirror
