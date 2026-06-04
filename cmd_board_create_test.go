@@ -57,6 +57,44 @@ func TestCmdBoardUpdate(t *testing.T) {
 	}
 }
 
+// TestReadBoardInputStageIDNormalization verifies that "stageID" is renamed to
+// "id" so the GraphQL StageQueryInput receives the correct field name. Without
+// this normalization the API silently ignores the stage label and generates
+// random IDs, breaking all card.stageId layout references.
+func TestReadBoardInputStageIDNormalization(t *testing.T) {
+	fa := FuncArgs{fs: NewFakeFs()}
+	boardJSON := []byte(`{
+		"name": "Test",
+		"workspaceId": "42379913",
+		"layout": {},
+		"stages": [
+			{"stageID": "stage-abc", "pipeline": "limit 10", "input": [{"inputName":"main","datasetId":"1"}]},
+			{"stageID": "stage-xyz", "pipeline": "limit 5", "input": []}
+		]
+	}`)
+	fa.fs.WriteFile("b.json", boardJSON, 0664)
+	input, err := readBoardInput(fa, "b.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	stages := input["stages"].([]any)
+	for _, s := range stages {
+		stage := s.(map[string]any)
+		if _, hasStageID := stage["stageID"]; hasStageID {
+			t.Error("stageID should have been removed from stage")
+		}
+		if _, hasID := stage["id"]; !hasID {
+			t.Error("id should have been added to stage")
+		}
+	}
+	if stages[0].(map[string]any)["id"] != "stage-abc" {
+		t.Errorf("expected id=stage-abc, got %v", stages[0].(map[string]any)["id"])
+	}
+	if stages[1].(map[string]any)["id"] != "stage-xyz" {
+		t.Errorf("expected id=stage-xyz, got %v", stages[1].(map[string]any)["id"])
+	}
+}
+
 // TestBoardViewURL verifies URL construction for a production-style config.
 func TestBoardViewURL(t *testing.T) {
 	cfg := &Config{

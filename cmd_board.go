@@ -77,14 +77,28 @@ func readBoardInput(fa FuncArgs, filePath string) (map[string]any, error) {
 	for _, f := range readOnlyBoardFields {
 		delete(input, f)
 	}
-	// Normalize stages: the GraphQL DashboardStageInput type requires "input"
-	// to be defined. Stages with no dataset input must send [] not omit the field.
+	// Normalize stages: fix up each stage object before sending to the API.
 	if stages, ok := input["stages"].([]any); ok {
 		for _, s := range stages {
-			if stage, ok := s.(map[string]any); ok {
-				if _, hasInput := stage["input"]; !hasInput {
-					stage["input"] = []any{}
+			stage, ok := s.(map[string]any)
+			if !ok {
+				continue
+			}
+			// StageQueryInput uses "id" for the user-defined stage label.
+			// Board JSON files (and older API exports) use the deprecated field
+			// name "stageID". Rename it so the API doesn't silently ignore it —
+			// if it goes missing the layout's card.stageId references break and
+			// every panel on the dashboard appears blank.
+			if sid, ok := stage["stageID"]; ok {
+				if _, hasID := stage["id"]; !hasID {
+					stage["id"] = sid
 				}
+				delete(stage, "stageID")
+			}
+			// GraphQL DashboardStageInput requires "input" to be defined.
+			// Stages with no dataset input must send [] not omit the field.
+			if _, hasInput := stage["input"]; !hasInput {
+				stage["input"] = []any{}
 			}
 		}
 	}
