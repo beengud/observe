@@ -14,6 +14,8 @@ type objectBoard struct {
 	Name        string
 	WorkspaceId string
 	Description string
+	FolderId    string
+	Visibility  string
 	UpdatedDate string
 	Layout      string
 	Stages      string
@@ -74,6 +76,20 @@ var propertyDescBoard = []PropertyDesc{
 		func(o any, v any) {
 			if v != nil {
 				o.(*objectBoard).Description = v.(string)
+			}
+		}},
+	{"folderId", PropertyTypeString, false, false,
+		func(o any) any { return o.(*objectBoard).FolderId },
+		func(o any, v any) {
+			if v != nil {
+				o.(*objectBoard).FolderId = v.(string)
+			}
+		}},
+	{"visibility", PropertyTypeString, false, false,
+		func(o any) any { return o.(*objectBoard).Visibility },
+		func(o any, v any) {
+			if v != nil {
+				o.(*objectBoard).Visibility = v.(string)
 			}
 		}},
 	{"updatedDate", PropertyTypeString, true, false,
@@ -231,6 +247,8 @@ var gqlGetBoard = compileGqlQuery(
 			name
 			workspaceId
 			description
+			folderId
+			visibility
 			updatedDate
 			layout
 			stages { id stageID pipeline input { inputName datasetId stageId } }
@@ -263,6 +281,12 @@ func (ot *objectTypeBoard) Get(cfg *Config, op Output, hc httpClient, id string)
 	}
 	if v, ok := raw["description"]; ok && v != nil {
 		o.Description = v.(string)
+	}
+	if v, ok := raw["folderId"]; ok && v != nil {
+		o.FolderId = v.(string)
+	}
+	if v, ok := raw["visibility"]; ok && v != nil {
+		o.Visibility = v.(string)
 	}
 	if v, ok := raw["updatedDate"]; ok && v != nil {
 		o.UpdatedDate = v.(string)
