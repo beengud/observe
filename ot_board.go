@@ -251,7 +251,7 @@ var gqlGetBoard = compileGqlQuery(
 			visibility
 			updatedDate
 			layout
-			stages { id stageID pipeline input { inputName datasetId stageId } }
+			stages { id stageID pipeline input { inputName datasetId stageId inputRole } }
 		}
 	}`,
 	"data", "dashboard",
