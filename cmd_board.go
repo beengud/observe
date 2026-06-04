@@ -54,6 +54,8 @@ var gqlSaveBoard = compileGqlQuery(
 			id
 			name
 			workspaceId
+			folderId
+			visibility
 		}
 	}`,
 	"data", "saveDashboard",
@@ -110,7 +112,11 @@ func cmdBoardCreate(fa FuncArgs) error {
 	}
 	name, _ := result["name"].(string)
 	id, _ := result["id"].(string)
+	workspaceId, _ := result["workspaceId"].(string)
+	visibility, _ := result["visibility"].(string)
 	fmt.Fprintf(fa.op, "Created: %s (id: %s)\n", name, id)
+	fmt.Fprintf(fa.op, "Visibility: %s\n", visibility)
+	fmt.Fprintf(fa.op, "View: %s\n", boardViewURL(fa.cfg, workspaceId, id))
 	return nil
 }
 
@@ -137,13 +143,18 @@ func cmdBoardUpdate(fa FuncArgs) error {
 	}
 	name, _ := result["name"].(string)
 	id, _ := result["id"].(string)
+	workspaceId, _ := result["workspaceId"].(string)
+	visibility, _ := result["visibility"].(string)
 	fmt.Fprintf(fa.op, "Updated: %s (id: %s)\n", name, id)
+	fmt.Fprintf(fa.op, "Visibility: %s\n", visibility)
+	fmt.Fprintf(fa.op, "View: %s\n", boardViewURL(fa.cfg, workspaceId, id))
 	return nil
 }
 
 var boardScaffoldTemplate = map[string]any{
 	"name":        "My Dashboard",
 	"workspaceId": "YOUR_WORKSPACE_ID",
+	"visibility":  "Listed",
 	"layout": map[string]any{
 		"autoPack": true,
 		"gridLayout": map[string]any{
@@ -278,6 +289,13 @@ func cmdBoardClearDefault(fa FuncArgs) error {
 	}
 	fmt.Fprintf(fa.op, "Default dashboard cleared successfully\n")
 	return nil
+}
+
+// boardViewURL returns the Observe UI URL for viewing a dashboard.
+// Pattern: https://{customerid}.{site}/workspace/{workspaceId}/dashboard/{boardId}
+// The UI also accepts a name-slug prefix (e.g. My-Board-43102612) but the bare ID works too.
+func boardViewURL(cfg *Config, workspaceId, boardId string) string {
+	return SiteUrl(cfg, fmt.Sprintf("/workspace/%s/dashboard/%s", workspaceId, boardId)).String()
 }
 
 func copyMap(m map[string]any) map[string]any {
