@@ -124,15 +124,21 @@ func TestReadBoardInputStageInputNormalization(t *testing.T) {
 	}
 	stages := input["stages"].([]any)
 	inputs := stages[0].(map[string]any)["input"].([]any)
-	// First entry had no stageId — should be normalized to ""
+	// First entry had no stageId or inputRole — should be normalized
 	entry0 := inputs[0].(map[string]any)
 	if entry0["stageId"] != "" {
 		t.Errorf("expected stageId=\"\" for dataset input, got %v", entry0["stageId"])
 	}
-	// Second entry already had stageId — should be preserved
+	if entry0["inputRole"] != "Data" {
+		t.Errorf("expected inputRole=\"Data\" for dataset input, got %v", entry0["inputRole"])
+	}
+	// Second entry already had stageId — should be preserved; inputRole normalized
 	entry1 := inputs[1].(map[string]any)
 	if entry1["stageId"] != "stage-xyz" {
 		t.Errorf("expected stageId=\"stage-xyz\" preserved, got %v", entry1["stageId"])
+	}
+	if entry1["inputRole"] != "Data" {
+		t.Errorf("expected inputRole=\"Data\" normalized, got %v", entry1["inputRole"])
 	}
 }
 
