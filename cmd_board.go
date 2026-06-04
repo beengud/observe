@@ -100,6 +100,22 @@ func readBoardInput(fa FuncArgs, filePath string) (map[string]any, error) {
 			if _, hasInput := stage["input"]; !hasInput {
 				stage["input"] = []any{}
 			}
+			// StageInput.stageId is String! (non-null) in the GraphQL schema.
+			// Dataset inputs use stageId="" (stage-to-stage inputs use a real
+			// stage id). If omitted the API stores null and any query that
+			// requests stageId: String! will return a schema-violation error
+			// ("requested element is null which schema does not allow").
+			if inputs, ok := stage["input"].([]any); ok {
+				for _, inp := range inputs {
+					entry, ok := inp.(map[string]any)
+					if !ok {
+						continue
+					}
+					if _, hasStageId := entry["stageId"]; !hasStageId {
+						entry["stageId"] = ""
+					}
+				}
+			}
 		}
 	}
 	return input, nil

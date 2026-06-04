@@ -95,6 +95,47 @@ func TestReadBoardInputStageIDNormalization(t *testing.T) {
 	}
 }
 
+// TestReadBoardInputStageInputNormalization verifies that each stage input gets
+// stageId: "" when it is not already present. StageInput.stageId is String!
+// (non-null) in the GraphQL schema; omitting it causes the API to store null,
+// which any subsequent query with stageId: String! will reject with "requested
+// element is null which schema does not allow".
+func TestReadBoardInputStageInputNormalization(t *testing.T) {
+	fa := FuncArgs{fs: NewFakeFs()}
+	boardJSON := []byte(`{
+		"name": "Test",
+		"workspaceId": "42379913",
+		"layout": {},
+		"stages": [
+			{
+				"stageID": "stage-abc",
+				"pipeline": "limit 10",
+				"input": [
+					{"inputName": "main", "datasetId": "42450595"},
+					{"inputName": "other", "datasetId": "42450596", "stageId": "stage-xyz"}
+				]
+			}
+		]
+	}`)
+	fa.fs.WriteFile("b.json", boardJSON, 0664)
+	input, err := readBoardInput(fa, "b.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	stages := input["stages"].([]any)
+	inputs := stages[0].(map[string]any)["input"].([]any)
+	// First entry had no stageId — should be normalized to ""
+	entry0 := inputs[0].(map[string]any)
+	if entry0["stageId"] != "" {
+		t.Errorf("expected stageId=\"\" for dataset input, got %v", entry0["stageId"])
+	}
+	// Second entry already had stageId — should be preserved
+	entry1 := inputs[1].(map[string]any)
+	if entry1["stageId"] != "stage-xyz" {
+		t.Errorf("expected stageId=\"stage-xyz\" preserved, got %v", entry1["stageId"])
+	}
+}
+
 // TestBoardViewURL verifies URL construction for a production-style config.
 func TestBoardViewURL(t *testing.T) {
 	cfg := &Config{
