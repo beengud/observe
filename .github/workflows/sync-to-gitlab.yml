@@ -16,13 +16,11 @@ jobs:
     name: Mirror → gitlab.com/nhl/mop/observe
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout (full history + all refs)
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Push mirror to GitLab
+      - name: Mirror clone and push to GitLab
         run: |
-          git remote add gitlab \
+          # Bare mirror clone contains only real refs (no remote-tracking refs),
+          # so GitLab won't reject the push with "deny updating a hidden ref".
+          git clone --mirror https://github.com/beengud/observe.git repo
+          cd repo
+          git push --mirror \
             "https://oauth2:${{ secrets.GITLAB_SYNC_TOKEN }}@gitlab.com/nhl/mop/observe.git"
-          git push gitlab --mirror
